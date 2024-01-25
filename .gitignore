@@ -1,8 +1,14 @@
-HELP.md
+# Exclude these files/directories
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+
+# Include these files/directories
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# Hide sensetive data
 .env
 
 ### STS ###
