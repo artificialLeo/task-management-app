@@ -1,49 +1,64 @@
 package com.taskmanagement.app.security;
 
 import com.taskmanagement.app.model.User;
-import io.jsonwebtoken.*;
-import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtParser;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.stereotype.Component;
-
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.stereotype.Component;
 
 @Component
 public class JwtUtil {
-
-
-
-    private final String secret_key = Base64.getEncoder().encodeToString(Keys.secretKeyFor(SignatureAlgorithm.HS256).getEncoded());
-
-    private long accessTokenValidity = 60*60*1000;
-
+    private static final String TOKEN_HEADER = "Authorization";
+    private static final String TOKEN_PREFIX = "Bearer ";
+    private final SecretKey secretKey;
+    private final long accessTokenValidity;
     private final JwtParser jwtParser;
 
-    private final String TOKEN_HEADER = "Authorization";
-    private final String TOKEN_PREFIX = "Bearer ";
+    public JwtUtil(
+            @Value("${jwt.expiration}") long accessTokenValidity,
+            @Value("${jwt.secret}") String jwtSecret
+    ) {
+        String encodedSecretKey = Base64.getEncoder()
+                .encodeToString(jwtSecret.getBytes(StandardCharsets.UTF_8));
+        System.out.println("Encoded Secret Key: " + encodedSecretKey);
 
-    public JwtUtil(){
-        this.jwtParser = Jwts.parser().setSigningKey(secret_key);
+        this.accessTokenValidity = accessTokenValidity;
+
+        byte[] decodedKey = Base64.getDecoder().decode(encodedSecretKey);
+        this.secretKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "HmacSHA256");
+
+        this.jwtParser = Jwts.parserBuilder().setSigningKey(secretKey).build();
     }
 
     public String createToken(User user) {
         Claims claims = Jwts.claims().setSubject(user.getEmail());
-        claims.put("firstName",user.getFirstName());
-        claims.put("lastName",user.getLastName());
+        claims.put("firstName", user.getFirstName());
+        claims.put("lastName", user.getLastName());
+
         Date tokenCreateTime = new Date();
-        Date tokenValidity = new Date(tokenCreateTime.getTime() + TimeUnit.MINUTES.toMillis(accessTokenValidity));
+        Date tokenValidity = new Date(tokenCreateTime.getTime()
+                + TimeUnit.MINUTES.toMillis(accessTokenValidity));
+
         return Jwts.builder()
                 .setClaims(claims)
                 .setExpiration(tokenValidity)
-                .signWith(SignatureAlgorithm.HS256, secret_key)
+                .signWith(secretKey, SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    private Claims parseJwtClaims(String token) {
+    public Claims parseJwtClaims(String token) {
         return jwtParser.parseClaimsJws(token).getBody();
     }
 
@@ -73,11 +88,7 @@ public class JwtUtil {
     }
 
     public boolean validateClaims(Claims claims) throws AuthenticationException {
-        try {
-            return claims.getExpiration().after(new Date());
-        } catch (Exception e) {
-            throw e;
-        }
+        return claims.getExpiration().after(new Date());
     }
 
     public String getEmail(Claims claims) {
@@ -85,8 +96,6 @@ public class JwtUtil {
     }
 
     private List<String> getRoles(Claims claims) {
-        return (List<String>) claims.get("roles");
+        return claims.get("roles", List.class);
     }
-
-
 }

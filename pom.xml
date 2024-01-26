@@ -144,7 +144,7 @@
                     <consoleOutput>true</consoleOutput>
                     <failsOnError>true</failsOnError>
                     <linkXRef>false</linkXRef>
-                    <includes>src</includes>
+<!--                    <includes>src</includes>-->
                 </configuration>
             </plugin>
             <plugin>
